@@ -102,6 +102,7 @@ def analyze_report(pdf_path: str):
         pickle.dump({"texts": texts, "vectors": vectors}, f)
 
     # ------- 3. ASK GROQ FOR STRUCTURED JSON -------
+    # FIX: Explicitly specify required tests
     prompt = f"""
 You are a medical lab report analysis AI.
 
@@ -124,9 +125,21 @@ From this lab report text, extract a JSON object with this **exact** structure:
   ]
 }}
 
+**IMPORTANT - You MUST extract ALL of these tests if they appear in the report:**
+1. Vitamin D (ng/mL or nmol/L)
+2. Hemoglobin (g/dL)
+3. White Blood Cells / WBC Count (x10³/µL or /µL)
+4. Total Cholesterol (mg/dL)
+5. Fasting Glucose (mg/dL)
+6. TSH (µIU/mL or mIU/L)
+
+If any of these tests are present in the report, they MUST be included in the "tests" array.
+Also include any other significant tests found in the report.
+
 Rules:
 - Return **ONLY valid JSON**. 
 - No backticks, no Markdown, no extra text before or after the JSON.
+- Extract numeric values without commas (e.g., "7900" not "7,900")
 
 Lab Report Text:
 \"\"\"{full_text}\"\"\"
@@ -142,9 +155,11 @@ Lab Report Text:
             time.sleep(wait_time)
         last_groq_call = time.time()
 
+    # FIX: Set temperature=0 for deterministic output
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
+        temperature=0,  # <-- ADD THIS for consistent output
     )
 
     raw_content = response.choices[0].message.content.strip()
@@ -167,6 +182,31 @@ Lab Report Text:
             "tests": [],
         }
 
+    # FIX: Validate required tests were extracted
+    extracted_tests = parsed.get("tests", [])
+    required_test_keywords = {
+        "vitamin d": False,
+        "hemoglobin": False,
+        "white blood": False,
+        "wbc": False,
+        "cholesterol": False,
+        "fasting glucose": False,
+        "tsh": False
+    }
+    
+    # Check which required tests were extracted
+    for test in extracted_tests:
+        test_name_lower = test.get("name", "").lower()
+        for keyword in required_test_keywords:
+            if keyword in test_name_lower:
+                required_test_keywords[keyword] = True
+    
+    # Log any missing tests for debugging
+    missing = [k for k, v in required_test_keywords.items() if not v]
+    if missing:
+        print(f"⚠️ Warning: These tests may be missing: {missing}")
+        print(f"   Extracted tests: {[t.get('name') for t in extracted_tests]}")
+
     ai_summary = {
         "overall": parsed.get("summary", ""),
         "keyFindings": parsed.get("key_findings", []),
@@ -177,7 +217,6 @@ Lab Report Text:
     test_results = parsed.get("tests", [])
 
     return ai_summary, test_results, embedding_path
-
 
 def get_latest_report_for_user(email: str):
     """
