@@ -51,13 +51,14 @@ const metrics = [
 ];
 
 // Map backend test names → metric key
+// FIX: Added more aliases to handle LLM naming variations
 const metricNameMap: Record<string, string[]> = {
-  hemoglobin: ["Hemoglobin"],
-  wbc: ["WBC", "White Blood Cells"],
-  cholesterol: ["Total Cholesterol", "Cholesterol"],
-  glucose: ["Fasting Glucose", "Blood Glucose"],
-  tsh: ["TSH"],
-  vitaminD: ["Vitamin D"],
+  hemoglobin: ["Hemoglobin", "Hgb", "Hb"],
+  wbc: ["WBC", "White Blood Cells", "WBC Count", "Leukocytes"],
+  cholesterol: ["Total Cholesterol", "Cholesterol", "TC"],
+  glucose: ["Fasting Glucose", "Blood Glucose", "FBS", "Fasting Blood Sugar", "Glucose"],
+  tsh: ["TSH", "Thyroid Stimulating Hormone"],
+  vitaminD: ["Vitamin D", "Vit D", "25-OH Vitamin D", "25-Hydroxyvitamin D"],
 };
 
 // -----------------------------
@@ -121,10 +122,16 @@ export default function Trends() {
 
           tests.forEach((t) => {
             Object.entries(metricNameMap).forEach(([metricId, matches]) => {
-              const cleanMatches = matches.map((m) => m.toLowerCase());
               const cleanName = t.name.trim().toLowerCase();
 
-              if (cleanMatches.includes(cleanName)) {
+              // FIX: Use partial matching instead of exact matching
+              // Check if ANY alias is contained in the test name, or vice versa
+              const isMatch = matches.some((alias) => {
+                const cleanAlias = alias.toLowerCase();
+                return cleanName.includes(cleanAlias) || cleanAlias.includes(cleanName);
+              });
+
+              if (isMatch) {
                 const value = parseFloat(t.value); // "11.9 g/dL" → 11.9
                 if (!isNaN(value)) {
                   newData[metricId].push({
