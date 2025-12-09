@@ -1,15 +1,18 @@
 const mongoose = require('mongoose');
 
 const testResultSchema = new mongoose.Schema({
-  testName: String,
+  name: String,           // AI returns "name" not "testName"
+  testName: String,       // Keep for backward compatibility
   value: mongoose.Schema.Types.Mixed,
   unit: String,
-  referenceRange: String,
+  normalRange: String,    // AI returns "normalRange" not "referenceRange"
+  referenceRange: String, // Keep for backward compatibility
   status: {
     type: String,
-    enum: ['normal', 'abnormal', 'critical'],
+    enum: ['low', 'normal', 'high', 'abnormal', 'critical'], // Accept all possible values
     default: 'normal'
-  }
+  },
+  interpretation: String  // AI also returns this
 }, { _id: false });
 
 const aiSummarySchema = new mongoose.Schema({
@@ -19,6 +22,7 @@ const aiSummarySchema = new mongoose.Schema({
     default: 'low'
   },
   summary: String,
+  overall: String,        // AI returns "overall" for summary
   recommendations: [String],
   keyFindings: [String]
 }, { _id: false });

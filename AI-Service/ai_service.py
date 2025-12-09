@@ -13,6 +13,8 @@ import os
 import json
 import pickle
 import re
+import time
+from threading import Lock
 
 import numpy as np
 from flask import Flask, request, jsonify
@@ -64,6 +66,11 @@ print("✅ Model loaded successfully!")
 # Embeddings Directory
 EMBED_DIR = "Embeddings"
 os.makedirs(EMBED_DIR, exist_ok=True)
+
+# Rate limiting for Groq API
+last_groq_call = 0
+groq_lock = Lock()
+MIN_GROQ_INTERVAL = 10  # Minimum seconds between Groq calls
 
 
 # ============================================================
@@ -129,6 +136,16 @@ Rules:
 Lab Report Text:
 \"\"\"{full_text}\"\"\"
 """
+
+    # Rate limiting for Groq API
+    global last_groq_call
+    with groq_lock:
+        elapsed = time.time() - last_groq_call
+        if elapsed < MIN_GROQ_INTERVAL:
+            wait_time = MIN_GROQ_INTERVAL - elapsed
+            print(f"⏳ Rate limiting: waiting {wait_time:.1f}s before Groq call")
+            time.sleep(wait_time)
+        last_groq_call = time.time()
 
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",

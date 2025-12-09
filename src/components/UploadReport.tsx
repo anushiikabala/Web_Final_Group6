@@ -13,7 +13,8 @@ export default function UploadReport({ onSignOut, onReportUpload, hasUploadedRep
   const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, ] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
 
@@ -43,24 +44,55 @@ export default function UploadReport({ onSignOut, onReportUpload, hasUploadedRep
   };
 
   const handleUpload = async () => {
-  if (!selectedFile) return;
+    if (!selectedFile || isUploading) return; // Prevent double-clicks
 
-  const formData = new FormData();
-  formData.append("file", selectedFile);
-  formData.append("email", localStorage.getItem("userEmail") || "");
+    setIsUploading(true);
+    setError(null);
+    setUploadProgress(0);
 
-  const res = await fetch("http://127.0.0.1:5000/upload-report", {
-    method: "POST",
-    body: formData,
-  });
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("email", localStorage.getItem("userEmail") || "");
 
-  const data = await res.json();
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 10, 90));
+      }, 500);
 
-  if (data.report_id) {
-    onReportUpload && onReportUpload();
-    navigate(`/report-insights/${data.report_id}`);
-  }
-};
+      const res = await fetch("http://127.0.0.1:5000/upload-report", {
+        method: "POST",
+        body: formData,
+      });
+
+      clearInterval(progressInterval);
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Upload failed");
+      }
+
+      const data = await res.json();
+      setUploadProgress(100);
+      setUploadComplete(true);
+
+      if (data.report_id) {
+        onReportUpload && onReportUpload();
+        // Small delay to show completion before navigating
+        setTimeout(() => {
+          navigate(`/report-insights/${data.report_id}`);
+        }, 1000);
+      } else {
+        throw new Error("No report ID received");
+      }
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      setError(err.message || "Failed to upload report. Please try again.");
+      setUploadProgress(0);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
 
 
@@ -68,6 +100,7 @@ export default function UploadReport({ onSignOut, onReportUpload, hasUploadedRep
     setSelectedFile(null);
     setUploadProgress(0);
     setUploadComplete(false);
+    setError(null);
   };
 
   return (
@@ -161,7 +194,14 @@ export default function UploadReport({ onSignOut, onReportUpload, hasUploadedRep
                 {uploadComplete && (
                   <div className="mt-6 flex items-center gap-2 text-green-600">
                     <CheckCircle2 className="w-5 h-5" />
-                    <span className="font-medium">Upload successful! Analyzing report...</span>
+                    <span className="font-medium">Upload successful! Redirecting to insights...</span>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="mt-6 flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-lg">
+                    <AlertCircle className="w-5 h-5" />
+                    <span className="font-medium">{error}</span>
                   </div>
                 )}
               </div>
