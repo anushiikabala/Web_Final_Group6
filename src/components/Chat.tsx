@@ -101,6 +101,22 @@ export default function Chat({ hasUploadedReports }: ChatProps) {
   const sendToBackend = async (msg: string) => {
   try {
     const email = localStorage.getItem("userEmail");
+    
+    if (!email) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          sender: "bot",
+          text: "Please sign in to use the chat feature.",
+          timestamp: nowTime(),
+        },
+      ]);
+      setIsTyping(false);
+      return;
+    }
+
+    console.log("Sending to AI:", { question: msg, email });
 
     const res = await fetch(`${API_BASE}/chat/ask`, {
       method: "POST",
@@ -108,7 +124,16 @@ export default function Chat({ hasUploadedReports }: ChatProps) {
       body: JSON.stringify({ question: msg, email }),
     });
 
+    console.log("Response status:", res.status);
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || `HTTP ${res.status}`);
+    }
+
     const data = await res.json();
+    console.log("AI Response:", data);
+    
     const answer = data.answer || "Sorry — I couldn't process that.";
 
     // Add bot message to UI
@@ -123,13 +148,14 @@ export default function Chat({ hasUploadedReports }: ChatProps) {
     ]);
 
     setIsTyping(false);
-  } catch (err) {
+  } catch (err: any) {
+    console.error("Chat error:", err);
     setMessages(prev => [
       ...prev,
       {
         id: Date.now() + 1,
         sender: "bot",
-        text: "Error contacting AI. Try again.",
+        text: `Error: ${err.message || "Could not contact AI. Please try again."}`,
         timestamp: nowTime(),
       },
     ]);

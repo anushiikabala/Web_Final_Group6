@@ -35,16 +35,11 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# CORS: Allow React frontend (5173) and Node.js backend (5000)
+# CORS: Allow all origins during development
 CORS(app, 
-     supports_credentials=True, 
-     resources={r"/*": {"origins": [
-         "http://localhost:5173",
-         "http://localhost:5000",
-         "http://127.0.0.1:5173",
-         "http://127.0.0.1:5000"
-     ]}},
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+     resources={r"/*": {"origins": "*"}},
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept"])
 
 # MongoDB Connection
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
@@ -70,7 +65,7 @@ os.makedirs(EMBED_DIR, exist_ok=True)
 # Rate limiting for Groq API
 last_groq_call = 0
 groq_lock = Lock()
-MIN_GROQ_INTERVAL = 10  # Minimum seconds between Groq calls
+MIN_GROQ_INTERVAL = 3  # Minimum seconds between Groq calls
 
 
 # ============================================================
@@ -221,6 +216,8 @@ def rag_chat(question: str, email: str):
     RAG-based chat: retrieve relevant context from embeddings
     and generate an answer using Groq LLM.
     """
+    print(f"💬 Chat request from {email}: {question[:50]}...")
+    
     if not question or not email:
         return {"answer": "Error: question + email required"}
 
@@ -231,21 +228,34 @@ def rag_chat(question: str, email: str):
     )
 
     if not latest:
-        return {"answer": "No reports uploaded yet."}
+        print(f"❌ No reports found for {email}")
+        return {"answer": "No reports uploaded yet. Please upload a lab report first."}
 
     pkl_path = latest.get("embedding_path")
+    print(f"📁 Embedding path from DB: {pkl_path}")
 
     if not pkl_path:
         return {"answer": "No embeddings found for this report."}
 
+    # Handle both relative and absolute paths
+    if not os.path.isabs(pkl_path):
+        # Try relative to AI-Service directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        pkl_path = os.path.join(script_dir, pkl_path)
+    
+    print(f"📁 Looking for embedding at: {pkl_path}")
+
     if not os.path.exists(pkl_path):
-        return {"answer": "Embedding file missing on server."}
+        print(f"❌ Embedding file not found: {pkl_path}")
+        return {"answer": "Embedding file missing on server. Please re-upload your report."}
 
     # 2️⃣ LOAD EMBEDDINGS
     try:
         with open(pkl_path, "rb") as f:
             emb = pickle.load(f)
+        print("✅ Embeddings loaded successfully")
     except Exception as e:
+        print(f"❌ Failed loading embeddings: {str(e)}")
         return {"answer": f"Failed loading embeddings: {str(e)}"}
 
     vectors = emb.get("vectors")
@@ -263,7 +273,7 @@ def rag_chat(question: str, email: str):
 
     context = "\n\n".join([texts[i] for i in top_idx])
 
-    # 5️⃣ CALL GROQ LLM
+    # 5️⃣ CALL GROQ LLM with rate limiting
     prompt = f"""
 Use ONLY the medical report info below to answer:
 
@@ -275,15 +285,28 @@ Give a clear, simple explanation suitable for a patient.
 """
 
     try:
+        # Rate limiting for Groq API
+        global last_groq_call
+        with groq_lock:
+            elapsed = time.time() - last_groq_call
+            if elapsed < MIN_GROQ_INTERVAL:
+                wait_time = MIN_GROQ_INTERVAL - elapsed
+                print(f"⏳ Rate limiting chat: waiting {wait_time:.1f}s before Groq call")
+                time.sleep(wait_time)
+            last_groq_call = time.time()
+
+        print("🤖 Calling Groq API...")
         response = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
         )
 
         answer = response.choices[0].message.content
+        print("✅ Got response from Groq")
         return {"answer": answer}
 
     except Exception as e:
+        print(f"❌ Groq API error: {str(e)}")
         return {"answer": f"Groq API error: {str(e)}"}
 
 
@@ -403,27 +426,38 @@ def chat_ask_endpoint():
     Response:
         {"answer": "..."}
     """
+    print("\n" + "="*50)
+    print("📩 Received POST /chat/ask")
+    
     try:
         data = request.get_json()
+        print(f"📦 Request data: {data}")
         
         if not data:
+            print("❌ No JSON data provided")
             return jsonify({"error": "No JSON data provided"}), 400
         
         question = data.get("question")
         email = data.get("email")
         
         if not question:
+            print("❌ Question is missing")
             return jsonify({"error": "question is required"}), 400
         
         if not email:
+            print("❌ Email is missing")
             return jsonify({"error": "email is required"}), 400
         
         result = rag_chat(question, email)
+        print(f"✅ Sending response: {str(result)[:100]}...")
+        print("="*50 + "\n")
         
         return jsonify(result)
         
     except Exception as e:
         print(f"❌ Error in /chat/ask: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
