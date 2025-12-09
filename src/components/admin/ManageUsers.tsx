@@ -3,6 +3,7 @@ import {
   Edit2, Trash2, Ban, CheckCircle, XCircle, Clock, Mail,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { API_BASE } from '../config';
 
 interface User {
   name: string;
@@ -27,7 +28,7 @@ export default function ManageUsers({ onLogout }: ManageUsersProps) {
   // -------------------------------
   const loadUsers = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:5000/admin/users");
+      const res = await fetch(`${API_BASE}/admin/users`);
       const data = await res.json();
       setUsers(data.users);
     } catch (err) {
@@ -49,7 +50,7 @@ export default function ManageUsers({ onLogout }: ManageUsersProps) {
     const newStatus = prompt("Enter status (active, suspended, pending):");
     if (!newStatus) return;
 
-    await fetch(`http://127.0.0.1:5000/admin/users/${email}`, {
+    await fetch(`${API_BASE}/admin/users/${email}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newName, status: newStatus })
@@ -65,7 +66,7 @@ export default function ManageUsers({ onLogout }: ManageUsersProps) {
   // Toggle: if suspended → active. If active → suspended
   const newStatus = currentStatus === "suspended" ? "active" : "suspended";
 
-  await fetch(`http://127.0.0.1:5000/admin/users/${email}/status`, {
+  await fetch(`${API_BASE}/admin/users/${email}/status`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status: newStatus })
@@ -82,7 +83,7 @@ export default function ManageUsers({ onLogout }: ManageUsersProps) {
     try {
       const encodedEmail = encodeURIComponent(email);
 
-      const res = await fetch(`http://127.0.0.1:5000/admin/users/${encodedEmail}`, {
+      const res = await fetch(`${API_BASE}/admin/users/${encodedEmail}`, {
         method: "DELETE",
       });
 

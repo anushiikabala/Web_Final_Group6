@@ -1,5 +1,6 @@
 import Navbar from './Navbar';
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { API_BASE } from './config';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -60,7 +61,7 @@ export default function UploadReport({ onSignOut, onReportUpload, hasUploadedRep
         setUploadProgress((prev) => Math.min(prev + 10, 90));
       }, 500);
 
-      const res = await fetch("http://127.0.0.1:5000/upload-report", {
+      const res = await fetch(`${API_BASE}/upload-report`, {
         method: "POST",
         body: formData,
       });

@@ -9,8 +9,8 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
-
 import { useEffect, useState } from 'react';
+import { API_BASE } from '../config';
 
 interface Report {
   _id: string;
@@ -35,7 +35,7 @@ export default function ManageReports() {
   // --------------------------------
   const loadReports = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:5000/admin/reports");
+      const res = await fetch(`${API_BASE}/admin/reports`);
       const data = await res.json();
       setReports(data.reports || []);
     } catch (err) {
@@ -54,7 +54,7 @@ export default function ManageReports() {
     if (!window.confirm("Delete this report permanently?")) return;
 
     try {
-      await fetch(`http://127.0.0.1:5000/admin/reports/${reportId}`, {
+      await fetch(`${API_BASE}/admin/reports/${reportId}`, {
         method: "DELETE",
       });
 
@@ -68,14 +68,14 @@ export default function ManageReports() {
   // VIEW PDF IN BROWSER
   // --------------------------------
   const handleView = (id: string) => {
-    window.open(`http://127.0.0.1:5000/admin/view/${id}`, "_blank");
+    window.open(`${API_BASE}/admin/view/${id}`, "_blank");
   };
 
   // --------------------------------
   // DOWNLOAD PDF
   // --------------------------------
   const handleDownload = (id: string) => {
-    window.open(`http://127.0.0.1:5000/admin/download/${id}`, "_blank");
+    window.open(`${API_BASE}/admin/download/${id}`, "_blank");
   };
 
   // --------------------------------

@@ -3,6 +3,7 @@ import {
   Users, FileText, Activity, TrendingUp,
   ArrowUp, ArrowDown, Clock
 } from 'lucide-react';
+import { API_BASE } from '../config';
 
 import {
   LineChart, Line, BarChart, Bar,
@@ -35,23 +36,23 @@ export default function AdminDashboard({ onLogout }: any) {
   // ------------------------------
   useEffect(() => {
 
-    fetch("http://127.0.0.1:5000/admin/dashboard/user-growth")
+    fetch(`${API_BASE}/admin/dashboard/user-growth`)
       .then(res => res.json())
       .then(data => setGrowthData(data.growth));
 
-    fetch("http://127.0.0.1:5000/admin/dashboard/recent-activity")
+    fetch(`${API_BASE}/admin/dashboard/recent-activity`)
       .then(res => res.json())
       .then(data => setRecentActivity(data.recent));
 
-    fetch("http://127.0.0.1:5000/admin/dashboard/report-status")
+    fetch(`${API_BASE}/admin/dashboard/report-status`)
       .then(res => res.json())
       .then(data => setStatusCounts(data));
 
-    fetch("http://127.0.0.1:5000/admin/users")
+    fetch(`${API_BASE}/admin/users`)
       .then(res => res.json())
       .then(data => setTotalUsers(data.users.length));
 
-    fetch("http://127.0.0.1:5000/admin/reports")
+    fetch(`${API_BASE}/admin/reports`)
       .then(res => res.json())
       .then(data => setTotalReports(data.reports.length));
 

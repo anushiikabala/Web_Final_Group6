@@ -2,6 +2,7 @@ import Navbar from './Navbar';
 import { FileText, Calendar, AlertCircle, CheckCircle, Eye, Download, Search, Upload,Trash2  } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { API_BASE } from './config';
 
 
 interface Report {
@@ -29,7 +30,7 @@ export default function ViewReports({ onSignOut }: ViewReportsProps) {
   const email = localStorage.getItem("userEmail");
   if (!email) return;
 
-  fetch(`http://127.0.0.1:5000/reports?email=${email}`)
+  fetch(`${API_BASE}/reports?email=${email}`)
     .then(res => res.json())
     .then(data => {
       const transformed = data.reports.map((r: any) => ({
@@ -86,7 +87,7 @@ export default function ViewReports({ onSignOut }: ViewReportsProps) {
   if (!window.confirm("Are you sure you want to delete this report?")) return;
 
   try {
-    const res = await fetch(`http://127.0.0.1:5000/delete-report/${reportId}`, {
+    const res = await fetch(`${API_BASE}/delete-report/${reportId}`, {
       method: "DELETE",
     });
 

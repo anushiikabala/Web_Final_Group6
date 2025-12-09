@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "./Navbar";
 import { Send, Bot, User, Sparkles, FileText } from "lucide-react";
+import { AI_SERVICE_URL } from "./config";
 
 interface ChatProps {
   hasUploadedReports?: boolean;
@@ -21,7 +22,7 @@ interface LatestReportInfo {
   uploaded_at: string;
 }
 
-const API_BASE = "http://127.0.0.1:5001";
+const API_BASE = AI_SERVICE_URL;
 
 export default function Chat({ hasUploadedReports }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([

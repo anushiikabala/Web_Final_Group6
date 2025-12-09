@@ -2,6 +2,7 @@ import Navbar from './Navbar';
 import { User, Calendar, Heart, Pill, AlertTriangle, Edit2, Save } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { profileSchema, validateField, hasErrors, rules } from './utils/validation';
+import { API_BASE } from './config';
 
 interface ProfileProps {
   onSignOut?: () => void;
@@ -60,7 +61,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
       return;
     }
 
-    fetch(`http://127.0.0.1:5000/profile?email=${email}`)
+    fetch(`${API_BASE}/profile?email=${email}`)
       .then(res => res.json())
       .then(data => {
         console.log("✅ PROFILE FROM BACKEND:", data);
@@ -137,7 +138,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
     }
 
     try {
-      const response = await fetch("http://127.0.0.1:5000/profile", {
+      const response = await fetch(`${API_BASE}/profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profile),

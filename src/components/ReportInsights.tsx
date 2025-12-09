@@ -1,5 +1,6 @@
 import Navbar from "./Navbar";
 import { useParams, Link } from "react-router-dom";
+import { API_BASE } from "./config";
 import {
   ArrowLeft,
   AlertCircle,
@@ -29,7 +30,7 @@ export default function ReportInsights() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:5000/report/${id}`)
+    fetch(`${API_BASE}/report/${id}`)
       .then((res) => res.json())
       .then((data) => {
         setReport(data);
