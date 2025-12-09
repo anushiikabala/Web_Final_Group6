@@ -4,7 +4,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { useState } from 'react';
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
-
+import { loginSchema, validateField, validateForm, hasErrors } from './utils/validation';
 
 interface SignInProps {
   onSignIn: () => void;
@@ -16,73 +16,89 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-const handleGoogleLogin = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
+  
+  // Validation state
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-    // Register user in backend if not exists
-    await fetch("http://127.0.0.1:5000/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: user.displayName,
-        email: user.email,
-        password: "google-oauth"
-      }),
-    });
+  // Handle field blur for real-time validation
+  const handleBlur = (field: string, value: string) => {
+    setTouched({ ...touched, [field]: true });
+    const error = validateField(value, loginSchema[field as keyof typeof loginSchema]);
+    setErrors({ ...errors, [field]: error });
+  };
 
-    // Store login in localStorage
-    localStorage.setItem("userEmail", user.email || "");
+  const handleGoogleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
 
-    alert("Signed in with Google!");
-    onSignIn();
-    navigate("/view-reports");
+      await fetch("http://127.0.0.1:5000/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: user.displayName,
+          email: user.email,
+          password: "google-oauth"
+        }),
+      });
 
-  } catch (err) {
-    console.error(err);
-    alert("Google sign-in failed");
-  }
-};
+      localStorage.setItem("userEmail", user.email || "");
+      alert("Signed in with Google!");
+      onSignIn();
+      navigate("/view-reports");
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    } catch (err) {
+      console.error(err);
+      alert("Google sign-in failed");
+    }
+  };
 
-  // ADMIN LOGIN (NO DB CHECK)
-  if (email === "admin1@gmail.com" && password === "abc") {
-    onAdminSignIn();
-    navigate("/admin/dashboard");
-    return;
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  // USER LOGIN (CHECK DB)
-  try {
-    const response = await fetch("http://127.0.0.1:5000/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    // Validate all fields on submit
+    const formValues = { email, password };
+    const validationErrors = validateForm(formValues, loginSchema);
+    setErrors(validationErrors);
+    setTouched({ email: true, password: true });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      alert(data.error);
+    // If there are validation errors, don't submit
+    if (hasErrors(validationErrors)) {
       return;
     }
 
-    // LOGIN SUCCESS
-   onSignIn();
-localStorage.setItem("userEmail", email);
-navigate("/view-reports");
+    // ADMIN LOGIN (NO DB CHECK)
+    if (email === "admin1@gmail.com" && password === "abc") {
+      onAdminSignIn();
+      navigate("/admin/dashboard");
+      return;
+    }
 
+    // USER LOGIN (CHECK DB)
+    try {
+      const response = await fetch("http://127.0.0.1:5000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
+      const data = await response.json();
 
-  } catch (error) {
-    console.error("Login error", error);
-    alert("Server error — backend not reachable");
-  }
-};
+      if (!response.ok) {
+        alert(data.error);
+        return;
+      }
 
+      onSignIn();
+      localStorage.setItem("userEmail", email);
+      navigate("/view-reports");
+
+    } catch (error) {
+      console.error("Login error", error);
+      alert("Server error — backend not reachable");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -126,11 +142,17 @@ navigate("/view-reports");
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => handleBlur('email', email)}
                     placeholder="you@example.com"
-                    className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className={`w-full pl-12 pr-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
+                      touched.email && errors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     required
                   />
                 </div>
+                {touched.email && errors.email && (
+                  <p className="mt-2 text-sm text-red-600">{errors.email}</p>
+                )}
               </div>
 
               {/* PASSWORD */}
@@ -142,11 +164,17 @@ navigate("/view-reports");
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onBlur={() => handleBlur('password', password)}
                     placeholder="••••••••"
-                    className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className={`w-full pl-12 pr-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
+                      touched.password && errors.password ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     required
                   />
                 </div>
+                {touched.password && errors.password && (
+                  <p className="mt-2 text-sm text-red-600">{errors.password}</p>
+                )}
               </div>
 
               {/* REMEMBER ME + FORGOT */}
@@ -187,12 +215,12 @@ navigate("/view-reports");
 
               <div className="mt-6 grid grid-cols-2 gap-4">
                 <button
-  onClick={handleGoogleLogin}
-  className="flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
->
-  <FcGoogle className="w-5 h-5" />
-  <span className="font-medium text-gray-700">Google</span>
-</button>
+                  onClick={handleGoogleLogin}
+                  className="flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  <FcGoogle className="w-5 h-5" />
+                  <span className="font-medium text-gray-700">Google</span>
+                </button>
 
                 <button className="flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
                   <Github className="w-5 h-5" />

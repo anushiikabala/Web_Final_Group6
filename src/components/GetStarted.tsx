@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FaGithub } from 'react-icons/fa';
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
+import { signupSchema, validateField, validateForm, hasErrors } from './utils/validation';
 
 interface GetStartedProps {
   onSignUp: () => void;
@@ -18,66 +19,121 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
     confirmPassword: '',
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  
+  // Validation state
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Handle field change with real-time validation for password
+  const handleChange = (field: string, value: string) => {
+    const newFormData = { ...formData, [field]: value };
+    setFormData(newFormData);
+    
+    // Real-time validation for password and confirmPassword fields
+    if (field === 'password' || field === 'confirmPassword') {
+      if (touched[field]) {
+        const error = validateField(
+          value,
+          signupSchema[field as keyof typeof signupSchema],
+          newFormData
+        );
+        setErrors({ ...errors, [field]: error });
+      }
+    } else {
+      // Clear error when user starts typing for other fields
+      if (errors[field]) {
+        setErrors({ ...errors, [field]: null });
+      }
+    }
+  };
+
+  // Handle field blur for real-time validation
+  const handleBlur = (field: string) => {
+    setTouched({ ...touched, [field]: true });
+    const error = validateField(
+      formData[field as keyof typeof formData],
+      signupSchema[field as keyof typeof signupSchema],
+      formData
+    );
+    setErrors({ ...errors, [field]: error });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match");
+    // Validate all fields on submit
+    const validationErrors = validateForm(formData, signupSchema);
+    setErrors(validationErrors);
+    setTouched({
+      name: true,
+      email: true,
+      password: true,
+      confirmPassword: true,
+    });
+
+    // If there are validation errors, don't submit
+    if (hasErrors(validationErrors)) {
+      return;
+    }
+
+    // Check terms agreement
+    if (!agreedToTerms) {
+      alert("Please agree to the Terms of Service and Privacy Policy");
       return;
     }
 
     // Call backend signup API
-    const response = await fetch("http://127.0.0.1:5000/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-      }),
-    });
+    try {
+      const response = await fetch("http://127.0.0.1:5000/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      alert(data.error);
-      return;
+      if (!response.ok) {
+        alert(data.error);
+        return;
+      }
+
+      alert("Account created successfully");
+      onSignUp();
+      navigate("/profile");
+    } catch (error) {
+      console.error("Signup error", error);
+      alert("Server error — backend not reachable");
     }
-
-    alert("Account created successfully");
-    onSignUp();
-    navigate("/profile");
   };
 
   const handleGoogleSignIn = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
 
-    const user = result.user;
+      await fetch("http://127.0.0.1:5000/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: user.displayName,
+          email: user.email,
+          password: "google-oauth",
+        }),
+      });
 
-    // SEND NAME + EMAIL TO BACKEND
-    await fetch("http://127.0.0.1:5000/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: user.displayName,
-        email: user.email,
-        password: "google-oauth", // dummy password
-      }),
-    });
+      localStorage.setItem("userEmail", user.email || "no-email");
+      alert("Signed in with Google!");
+      navigate("/profile");
 
-    localStorage.setItem("userEmail", user.email || "no-email");
-
-    alert("Signed in with Google!");
-    navigate("/profile");
-
-  } catch (err) {
-    console.error(err);
-    alert("Google sign-in failed");
-  }
-};
-
+    } catch (err) {
+      console.error(err);
+      alert("Google sign-in failed");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-6">
@@ -98,6 +154,7 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* FULL NAME */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name
@@ -106,13 +163,20 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
                 id="name"
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => handleChange('name', e.target.value)}
+                onBlur={() => handleBlur('name')}
                 placeholder="John Doe"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all ${
+                  touched.name && errors.name ? 'border-red-500' : 'border-gray-300'
+                }`}
                 required
               />
+              {touched.name && errors.name && (
+                <p className="mt-2 text-sm text-red-600">{errors.name}</p>
+              )}
             </div>
 
+            {/* EMAIL */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
@@ -121,13 +185,20 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => handleChange('email', e.target.value)}
+                onBlur={() => handleBlur('email')}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all ${
+                  touched.email && errors.email ? 'border-red-500' : 'border-gray-300'
+                }`}
                 required
               />
+              {touched.email && errors.email && (
+                <p className="mt-2 text-sm text-red-600">{errors.email}</p>
+              )}
             </div>
 
+            {/* PASSWORD */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
@@ -136,13 +207,29 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
                 id="password"
                 type="password"
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) => handleChange('password', e.target.value)}
+                onBlur={() => handleBlur('password')}
                 placeholder="Create a strong password"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all ${
+                  touched.password && errors.password ? 'border-red-500' : 'border-gray-300'
+                }`}
                 required
               />
+              {touched.password && errors.password && (
+                <p className="mt-2 text-sm text-red-600">{errors.password}</p>
+              )}
+              {/* Password requirements hint */}
+              {touched.password && !errors.password && formData.password.length >= 8 && (
+                <p className="mt-2 text-sm text-green-600">✓ Password meets requirements</p>
+              )}
+              {(!touched.password || (touched.password && errors.password)) && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Must be 8+ characters with uppercase, lowercase, and number
+                </p>
+              )}
             </div>
 
+            {/* CONFIRM PASSWORD */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
                 Confirm Password
@@ -151,13 +238,20 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
                 id="confirmPassword"
                 type="password"
                 value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                onBlur={() => handleBlur('confirmPassword')}
                 placeholder="Re-enter your password"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all ${
+                  touched.confirmPassword && errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                }`}
                 required
               />
+              {touched.confirmPassword && errors.confirmPassword && (
+                <p className="mt-2 text-sm text-red-600">{errors.confirmPassword}</p>
+              )}
             </div>
 
+            {/* TERMS CHECKBOX */}
             <div className="flex items-start gap-2">
               <input
                 type="checkbox"
@@ -178,6 +272,7 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
               </label>
             </div>
 
+            {/* SUBMIT BUTTON */}
             <button
               type="submit"
               className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-medium hover:bg-blue-700 transition-colors"
@@ -186,6 +281,7 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
             </button>
           </form>
 
+          {/* SOCIAL LOGIN */}
           <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -197,18 +293,13 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-4">
-              {/* <button className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
+              <button
+                onClick={handleGoogleSignIn}
+                className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+              >
                 <Chrome className="w-5 h-5" />
                 <span className="text-sm font-medium text-gray-700">Google</span>
-              </button> */}
-              <button
-  onClick={handleGoogleSignIn}
-  className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
->
-  <Chrome className="w-5 h-5" />
-  <span className="text-sm font-medium text-gray-700">Google</span>
-</button>
-
+              </button>
 
               <button className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
                 <FaGithub className="w-5 h-5" />

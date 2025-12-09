@@ -1,6 +1,7 @@
 import Navbar from './Navbar';
 import { User, Calendar, Heart, Pill, AlertTriangle, Edit2, Save } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { profileSchema, validateField, hasErrors, rules } from './utils/validation';
 
 interface ProfileProps {
   onSignOut?: () => void;
@@ -30,6 +31,10 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
   const [newAllergy, setNewAllergy] = useState('');
   const [newMedication, setNewMedication] = useState('');
 
+  // Validation state
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
   const [profile, setProfile] = useState<ProfileType>({
     name: "",
     email: "",
@@ -47,7 +52,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
     unitPreference: "metric",
   });
 
-  // ✅ ✅ ✅ FETCH PROFILE FROM BACKEND
+  // Fetch profile from backend
   useEffect(() => {
     const email = localStorage.getItem("userEmail");
     if (!email) {
@@ -64,13 +69,78 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
       .catch(err => console.error("❌ Profile fetch error:", err));
   }, []);
 
-  // ✅ ✅ ✅ SAVE PROFILE TO BACKEND (FIXED)
+  // Handle field change with validation
+  const handleFieldChange = (field: string, value: string) => {
+    setProfile({ ...profile, [field]: value });
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: null });
+    }
+  };
+
+  // Handle field blur for real-time validation
+  const handleBlur = (field: string) => {
+    if (!isEditing) return;
+    
+    setTouched({ ...touched, [field]: true });
+    
+    const schema = profileSchema[field as keyof typeof profileSchema];
+    if (schema) {
+      const error = validateField(
+        String(profile[field as keyof ProfileType] || ''),
+        schema
+      );
+      setErrors({ ...errors, [field]: error });
+    }
+  };
+
+  // Validate all editable fields
+  const validateAllFields = (): boolean => {
+    const newErrors: Record<string, string | null> = {};
+    const newTouched: Record<string, boolean> = {};
+    
+    // Validate name (required)
+    newErrors.name = validateField(profile.name, profileSchema.name);
+    newTouched.name = true;
+    
+    // Validate phone (optional but must be valid if provided)
+    if (profile.phone) {
+      newErrors.phone = validateField(profile.phone, profileSchema.phone);
+      newTouched.phone = true;
+    }
+    
+    // Validate height (optional but must be valid if provided)
+    if (profile.height) {
+      newErrors.height = validateField(profile.height, profileSchema.height);
+      newTouched.height = true;
+    }
+    
+    // Validate weight (optional but must be valid if provided)
+    if (profile.weight) {
+      newErrors.weight = validateField(profile.weight, profileSchema.weight);
+      newTouched.weight = true;
+    }
+    
+    setErrors(newErrors);
+    setTouched(newTouched);
+    
+    return !hasErrors(newErrors);
+  };
+
+  // Save profile to backend
   const handleSave = async () => {
+    // Validate before saving
+    if (!validateAllFields()) {
+      alert("Please fix the validation errors before saving.");
+      return;
+    }
+
     try {
       const response = await fetch("http://127.0.0.1:5000/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile), // ✅ email is included
+        body: JSON.stringify(profile),
       });
 
       const data = await response.json();
@@ -82,11 +152,21 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
 
       alert("✅ Profile updated successfully!");
       setIsEditing(false);
+      setTouched({});
+      setErrors({});
 
     } catch (err) {
       console.error("❌ Save error:", err);
       alert("Backend connection failed");
     }
+  };
+
+  // Cancel editing
+  const handleCancel = () => {
+    setIsEditing(false);
+    setTouched({});
+    setErrors({});
+    // Optionally refetch profile to reset changes
   };
 
   return (
@@ -100,13 +180,23 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
             <h1 className="text-gray-900 mb-4">My Profile</h1>
             <p className="text-lg text-gray-600">Manage your personal and health information</p>
           </div>
-          <button
-            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            {isEditing ? <Save className="w-5 h-5" /> : <Edit2 className="w-5 h-5" />}
-            {isEditing ? 'Save Changes' : 'Edit Profile'}
-          </button>
+          <div className="flex gap-3">
+            {isEditing && (
+              <button
+                onClick={handleCancel}
+                className="flex items-center gap-2 bg-gray-200 text-gray-700 px-8 py-4 rounded-xl font-medium hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+              className="flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              {isEditing ? <Save className="w-5 h-5" /> : <Edit2 className="w-5 h-5" />}
+              {isEditing ? 'Save Changes' : 'Edit Profile'}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -134,15 +224,24 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
             <h3 className="text-gray-900 mb-12">Personal Information</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* FULL NAME */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Full Name</label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={profile.name}
-                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
+                  <>
+                    <input
+                      type="text"
+                      value={profile.name}
+                      onChange={(e) => handleFieldChange('name', e.target.value)}
+                      onBlur={() => handleBlur('name')}
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
+                        touched.name && errors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {touched.name && errors.name && (
+                      <p className="mt-2 text-sm text-red-600">{errors.name}</p>
+                    )}
+                  </>
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
                     <span className="text-gray-900">{profile.name}</span>
@@ -150,6 +249,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                 )}
               </div>
 
+              {/* EMAIL (Read-only) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Email Address</label>
                 <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
@@ -157,22 +257,33 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                 </div>
               </div>
 
+              {/* PHONE */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Phone Number</label>
                 {isEditing ? (
-                  <input
-                    type="tel"
-                    value={profile.phone}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
+                  <>
+                    <input
+                      type="tel"
+                      value={profile.phone}
+                      onChange={(e) => handleFieldChange('phone', e.target.value)}
+                      onBlur={() => handleBlur('phone')}
+                      placeholder="(123) 456-7890"
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
+                        touched.phone && errors.phone ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {touched.phone && errors.phone && (
+                      <p className="mt-2 text-sm text-red-600">{errors.phone}</p>
+                    )}
+                  </>
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <span className="text-gray-900">{profile.phone}</span>
+                    <span className="text-gray-900">{profile.phone || 'Not provided'}</span>
                   </div>
                 )}
               </div>
 
+              {/* DATE OF BIRTH */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Date of Birth</label>
                 {isEditing ? (
@@ -180,15 +291,17 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                     type="date"
                     value={profile.dateOfBirth}
                     onChange={(e) => setProfile({ ...profile, dateOfBirth: e.target.value })}
+                    max={new Date().toISOString().split('T')[0]}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <span className="text-gray-900">{new Date(profile.dateOfBirth).toLocaleDateString()}</span>
+                    <span className="text-gray-900">{profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : 'Not provided'}</span>
                   </div>
                 )}
               </div>
 
+              {/* GENDER */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Gender</label>
                 {isEditing ? (
@@ -197,17 +310,19 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                     onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                   >
+                    <option value="">Select gender</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Other">Other</option>
                   </select>
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <span className="text-gray-900">{profile.gender}</span>
+                    <span className="text-gray-900">{profile.gender || 'Not provided'}</span>
                   </div>
                 )}
               </div>
 
+              {/* BLOOD TYPE */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Blood Type</label>
                 {isEditing ? (
@@ -216,6 +331,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                     onChange={(e) => setProfile({ ...profile, bloodType: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                   >
+                    <option value="">Select blood type</option>
                     <option value="A+">A+</option>
                     <option value="A-">A-</option>
                     <option value="B+">B+</option>
@@ -227,56 +343,78 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                   </select>
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <span className="text-gray-900">{profile.bloodType}</span>
+                    <span className="text-gray-900">{profile.bloodType || 'Not provided'}</span>
                   </div>
                 )}
               </div>
 
+              {/* HEIGHT */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Height (cm)</label>
                 {isEditing ? (
-                  <input
-                    type="number"
-                    value={profile.height}
-                    onChange={(e) => setProfile({ ...profile, height: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  <>
+                    <input
+                      type="number"
+                      value={profile.height}
+                      onChange={(e) => handleFieldChange('height', e.target.value)}
+                      onBlur={() => handleBlur('height')}
+                      placeholder="170"
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${
+                        touched.height && errors.height ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {touched.height && errors.height && (
+                      <p className="mt-2 text-sm text-red-600">{errors.height}</p>
+                    )}
+                  </>
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <span className="text-gray-900">{profile.height} cm</span>
+                    <span className="text-gray-900">{profile.height ? `${profile.height} cm` : 'Not provided'}</span>
                   </div>
                 )}
               </div>
 
+              {/* WEIGHT */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Weight (kg)</label>
                 {isEditing ? (
-                  <input
-                    type="number"
-                    value={profile.weight}
-                    onChange={(e) => setProfile({ ...profile, weight: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  <>
+                    <input
+                      type="number"
+                      value={profile.weight}
+                      onChange={(e) => handleFieldChange('weight', e.target.value)}
+                      onBlur={() => handleBlur('weight')}
+                      placeholder="70"
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${
+                        touched.weight && errors.weight ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {touched.weight && errors.weight && (
+                      <p className="mt-2 text-sm text-red-600">{errors.weight}</p>
+                    )}
+                  </>
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <span className="text-gray-900">{profile.weight} kg</span>
+                    <span className="text-gray-900">{profile.weight ? `${profile.weight} kg` : 'Not provided'}</span>
                   </div>
                 )}
               </div>
             </div>
 
+            {/* ADDRESS */}
             <div className="mt-8">
               <label className="block text-sm font-medium text-gray-700 mb-3">Address</label>
               {isEditing ? (
                 <textarea
                   value={profile.address}
                   onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                  placeholder="Enter your address"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                   rows={3}
                 />
               ) : (
                 <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
-                  <span className="text-gray-900">{profile.address}</span>
+                  <span className="text-gray-900">{profile.address || 'Not provided'}</span>
                 </div>
               )}
             </div>
@@ -288,6 +426,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
           <h3 className="text-gray-900 mb-12">Medical Information</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            {/* MEDICAL CONDITIONS */}
             <div>
               <div className="flex items-center gap-2 mb-8">
                 <Heart className="w-5 h-5 text-red-600" />
@@ -298,7 +437,15 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                   <div key={index} className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-xl">
                     <span className="text-red-900 font-medium">{condition}</span>
                     {isEditing && (
-                      <button className="text-red-600 hover:text-red-800 text-xl leading-none">×</button>
+                      <button 
+                        onClick={() => setProfile({
+                          ...profile,
+                          medicalConditions: profile.medicalConditions.filter((_, i) => i !== index)
+                        })}
+                        className="text-red-600 hover:text-red-800 text-xl leading-none"
+                      >
+                        ×
+                      </button>
                     )}
                   </div>
                 ))}
@@ -308,12 +455,15 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                       type="text"
                       value={newCondition}
                       onChange={(e) => setNewCondition(e.target.value)}
+                      placeholder="Add condition"
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     <button
                       onClick={() => {
-                        setProfile({ ...profile, medicalConditions: [...profile.medicalConditions, newCondition] });
-                        setNewCondition('');
+                        if (newCondition.trim()) {
+                          setProfile({ ...profile, medicalConditions: [...profile.medicalConditions, newCondition.trim()] });
+                          setNewCondition('');
+                        }
                       }}
                       className="bg-blue-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
                     >
@@ -324,6 +474,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
               </div>
             </div>
 
+            {/* ALLERGIES */}
             <div>
               <div className="flex items-center gap-2 mb-8">
                 <AlertTriangle className="w-5 h-5 text-yellow-600" />
@@ -334,7 +485,15 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                   <div key={index} className="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
                     <span className="text-yellow-900 font-medium">{allergy}</span>
                     {isEditing && (
-                      <button className="text-yellow-600 hover:text-yellow-800 text-xl leading-none">×</button>
+                      <button 
+                        onClick={() => setProfile({
+                          ...profile,
+                          allergies: profile.allergies.filter((_, i) => i !== index)
+                        })}
+                        className="text-yellow-600 hover:text-yellow-800 text-xl leading-none"
+                      >
+                        ×
+                      </button>
                     )}
                   </div>
                 ))}
@@ -344,12 +503,15 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                       type="text"
                       value={newAllergy}
                       onChange={(e) => setNewAllergy(e.target.value)}
+                      placeholder="Add allergy"
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     <button
                       onClick={() => {
-                        setProfile({ ...profile, allergies: [...profile.allergies, newAllergy] });
-                        setNewAllergy('');
+                        if (newAllergy.trim()) {
+                          setProfile({ ...profile, allergies: [...profile.allergies, newAllergy.trim()] });
+                          setNewAllergy('');
+                        }
                       }}
                       className="bg-blue-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
                     >
@@ -360,6 +522,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
               </div>
             </div>
 
+            {/* MEDICATIONS */}
             <div>
               <div className="flex items-center gap-2 mb-8">
                 <Pill className="w-5 h-5 text-blue-600" />
@@ -370,7 +533,15 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                   <div key={index} className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-xl">
                     <span className="text-blue-900 font-medium">{medication}</span>
                     {isEditing && (
-                      <button className="text-blue-600 hover:text-blue-800 text-xl leading-none">×</button>
+                      <button 
+                        onClick={() => setProfile({
+                          ...profile,
+                          medications: profile.medications.filter((_, i) => i !== index)
+                        })}
+                        className="text-blue-600 hover:text-blue-800 text-xl leading-none"
+                      >
+                        ×
+                      </button>
                     )}
                   </div>
                 ))}
@@ -380,12 +551,15 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
                       type="text"
                       value={newMedication}
                       onChange={(e) => setNewMedication(e.target.value)}
+                      placeholder="Add medication"
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     <button
                       onClick={() => {
-                        setProfile({ ...profile, medications: [...profile.medications, newMedication] });
-                        setNewMedication('');
+                        if (newMedication.trim()) {
+                          setProfile({ ...profile, medications: [...profile.medications, newMedication.trim()] });
+                          setNewMedication('');
+                        }
                       }}
                       className="bg-blue-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
                     >
@@ -397,6 +571,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
             </div>
           </div>
 
+          {/* UNIT PREFERENCE */}
           <div className="mt-10 pt-10 border-t border-gray-200">
             <label className="block text-sm font-medium text-gray-700 mb-4">Unit Preference</label>
             <div className="flex gap-6">
