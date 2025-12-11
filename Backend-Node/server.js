@@ -12,6 +12,10 @@ const uploadRoutes = require('./routes/upload');
 const adminRoutes = require('./routes/admin');
 const adminDashboardRoutes = require('./routes/adminDashboard');
 const adminReportsRoutes = require('./routes/adminReports');
+const adminDoctorRoutes = require('./routes/adminDoctor');
+const doctorProfileRoutes = require('./routes/doctorProfile');
+const doctorRoutes = require('./routes/doctorRoutes');
+const doctorDashboardRoutes = require('./routes/doctorDashboard');
 
 // Initialize Express app
 const app = express();
@@ -41,6 +45,10 @@ app.use('/', uploadRoutes);   // /upload-report, /reports, /report/:id, /delete-
 app.use('/admin', adminRoutes);
 app.use('/admin', adminDashboardRoutes);
 app.use('/admin', adminReportsRoutes);
+app.use('/admin', adminDoctorRoutes);    // /admin/create-doctor, /admin/get-doctors, etc.
+app.use('/doctor', doctorProfileRoutes); // /doctor/profile/:email, /doctor/update-profile/:email
+app.use('/api', doctorDashboardRoutes);  // /api/doctor/dashboard/patients, etc.
+app.use('/', doctorRoutes);              // /doctors, /assign-doctor, /send-request, /doctor/patients/:email, etc.
 
 // Health check endpoint
 app.get('/health', (req, res) => {
