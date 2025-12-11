@@ -16,6 +16,7 @@ import {
 import React, { useState, useEffect } from "react";
 import { API_BASE } from "../config";
 import { addDoctorSchema, validateField, validateForm, hasErrors } from '../utils/validation';
+import { toast } from 'sonner';
 
 interface ManageDoctorsProps {
   onLogout?: () => void;
@@ -176,7 +177,7 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Error creating doctor");
+        toast.error(data.error || "Error creating doctor");
         return;
       }
 
@@ -191,9 +192,10 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
       // Reset form and validation state
       resetForm();
 
+      toast.success("Doctor added successfully!");
       await fetchDoctors();
     } catch (error) {
-      alert("Server error - backend not reachable");
+      toast.error("Server error - backend not reachable");
       console.error(error);
     } finally {
       setSaving(false);
@@ -232,10 +234,11 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
       );
 
       if (!res.ok) {
-        alert("Update failed");
+        toast.error("Update failed");
         return;
       }
 
+      toast.success("Doctor updated successfully!");
       await fetchDoctors();
       setShowEditModal(false);
       setSelectedDoctor(null);
@@ -270,13 +273,15 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
       });
 
       if (!res.ok) {
-        alert("Delete failed");
+        toast.error("Delete failed");
         return;
       }
 
       setDoctors((prev) => prev.filter((d) => d.doctorEmail !== email));
+      toast.success("Doctor removed successfully!");
     } catch (err) {
       console.error("Delete error:", err);
+      toast.error("Error deleting doctor");
     }
   };
 

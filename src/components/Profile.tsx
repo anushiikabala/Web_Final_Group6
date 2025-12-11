@@ -3,6 +3,7 @@ import { User, Calendar, Heart, Pill, AlertTriangle, Edit2, Save } from 'lucide-
 import { useState, useEffect } from 'react';
 import { profileSchema, validateField, hasErrors, rules } from './utils/validation';
 import { API_BASE } from './config';
+import { toast } from 'sonner';
 
 interface ProfileProps {
   onSignOut?: () => void;
@@ -133,7 +134,7 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
   const handleSave = async () => {
     // Validate before saving
     if (!validateAllFields()) {
-      alert("Please fix the validation errors before saving.");
+      toast.warning("Please fix the validation errors before saving.");
       return;
     }
 
@@ -147,18 +148,18 @@ export default function Profile({ onSignOut, hasUploadedReports }: ProfileProps)
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Update failed");
+        toast.error(data.error || "Update failed");
         return;
       }
 
-      alert("✅ Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       setIsEditing(false);
       setTouched({});
       setErrors({});
 
     } catch (err) {
       console.error("❌ Save error:", err);
-      alert("Backend connection failed");
+      toast.error("Backend connection failed");
     }
   };
 

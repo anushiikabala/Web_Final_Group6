@@ -6,6 +6,7 @@ import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import { signupSchema, validateField, validateForm, hasErrors } from './utils/validation';
 import { API_BASE } from './config';
+import { toast } from 'sonner';
 
 interface GetStartedProps {
   onSignUp: () => void;
@@ -79,7 +80,7 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
 
     // Check terms agreement
     if (!agreedToTerms) {
-      alert("Please agree to the Terms of Service and Privacy Policy");
+      toast.warning("Please agree to the Terms of Service and Privacy Policy");
       return;
     }
 
@@ -98,19 +99,19 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error);
+        toast.error(data.error || "Signup failed");
         return;
       }
 
       // Store the new user's email in localStorage
       localStorage.setItem("userEmail", formData.email);
       
-      alert("Account created successfully");
+      toast.success("Account created successfully!");
       onSignUp();
       navigate("/profile");
     } catch (error) {
       console.error("Signup error", error);
-      alert("Server error — backend not reachable");
+      toast.error("Server error — backend not reachable");
     }
   };
 
@@ -130,12 +131,12 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
       });
 
       localStorage.setItem("userEmail", user.email || "no-email");
-      alert("Signed in with Google!");
+      toast.success("Signed in with Google!");
       navigate("/profile");
 
     } catch (err) {
       console.error(err);
-      alert("Google sign-in failed");
+      toast.error("Google sign-in failed");
     }
   };
 

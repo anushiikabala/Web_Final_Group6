@@ -6,6 +6,7 @@ import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import { loginSchema, validateField, validateForm, hasErrors } from './utils/validation';
 import { API_BASE } from './config';
+import { toast } from 'sonner';
 
 interface SignInProps {
   onSignIn: () => void;
@@ -48,13 +49,13 @@ export default function SignIn({ onSignIn, onAdminSignIn, onDoctorSignIn }: Sign
       });
 
       localStorage.setItem("userEmail", user.email || "");
-      alert("Signed in with Google!");
+      toast.success("Signed in with Google!");
       onSignIn();
       navigate("/view-reports");
 
     } catch (err) {
       console.error(err);
-      alert("Google sign-in failed");
+      toast.error("Google sign-in failed");
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +87,7 @@ export default function SignIn({ onSignIn, onAdminSignIn, onDoctorSignIn }: Sign
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Invalid credentials");
+        toast.error(data.error || "Invalid credentials");
         setIsLoading(false);
         return;
       }
@@ -119,7 +120,7 @@ export default function SignIn({ onSignIn, onAdminSignIn, onDoctorSignIn }: Sign
 
     } catch (error) {
       console.error("Login error", error);
-      alert("Server error — backend not reachable");
+      toast.error("Server error — backend not reachable");
     } finally {
       setIsLoading(false);
     }

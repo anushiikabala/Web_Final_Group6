@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { Toaster } from './components/ui/sonner';
 
 // User Components
 import Home from './components/Home';
@@ -105,6 +106,8 @@ export default function App() {
   };
 
   return (
+    <>
+    <Toaster />
     <Router>
       <Routes>
         {/* ==================== PUBLIC ROUTES ==================== */}
@@ -157,7 +160,7 @@ export default function App() {
         />
         <Route
           path="/settings"
-          element={isAuthenticated ? <Settings hasUploadedReports={hasUploadedReports} /> : <Navigate to="/signin" />}
+          element={isAuthenticated ? <Settings hasUploadedReports={hasUploadedReports} onSignOut={handleSignOut} /> : <Navigate to="/signin" />}
         />
 
         {/* ==================== ADMIN PROTECTED ROUTES ==================== */}
@@ -204,5 +207,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
+    </>
   );
 }

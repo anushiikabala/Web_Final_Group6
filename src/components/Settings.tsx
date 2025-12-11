@@ -2,12 +2,14 @@ import Navbar from './Navbar';
 import { Bell, Trash2, Globe, Shield } from 'lucide-react';
 import { API_BASE } from './config';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface SettingsProps {
-  onSignOut: () => void;
+  onSignOut?: () => void;
+  hasUploadedReports?: boolean;
 }
 
-export default function Settings({ onSignOut }: SettingsProps) {
+export default function Settings({ onSignOut, hasUploadedReports }: SettingsProps) {
   const [settings, setSettings] = useState({
     emailNotifications: true,
     reportAlerts: true,
@@ -32,18 +34,18 @@ export default function Settings({ onSignOut }: SettingsProps) {
   const email = localStorage.getItem("userEmail");
 
   if (!email) {
-    alert("User not logged in");
+    toast.error("User not logged in");
     return;
   }
 
   // ✅ 1. PASSWORD MATCH VALIDATION
   if (newPassword !== confirmPassword) {
-    alert("New password and confirm password do not match");
+    toast.error("New password and confirm password do not match");
     return;
   }
 
   if (!currentPassword || !newPassword || !confirmPassword) {
-    alert("Please fill all password fields");
+    toast.warning("Please fill all password fields");
     return;
   }
 
@@ -61,12 +63,12 @@ export default function Settings({ onSignOut }: SettingsProps) {
     const data = await response.json();
 
     if (!response.ok) {
-      alert(data.error);
+      toast.error(data.error || "Password update failed");
       return;
     }
 
     // ✅ 2. SUCCESS RESET + UI CLOSE
-    alert("Password updated successfully");
+    toast.success("Password updated successfully!");
 
     setCurrentPassword("");
     setNewPassword("");
@@ -75,7 +77,7 @@ export default function Settings({ onSignOut }: SettingsProps) {
 
   } catch (error) {
     console.error("Password update error:", error);
-    alert("Backend connection failed");
+    toast.error("Backend connection failed");
   }
 };
 
@@ -84,7 +86,7 @@ export default function Settings({ onSignOut }: SettingsProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar onSignOut={onSignOut} />
+      <Navbar onSignOut={onSignOut} hasUploadedReports={hasUploadedReports} />
 
       <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 py-20">
         {/* Header */}
@@ -316,7 +318,10 @@ export default function Settings({ onSignOut }: SettingsProps) {
                   </p>
                   <div className="flex gap-4">
                     <button
-                      onClick={() => alert('Account deleted (demo)')}
+                      onClick={() => {
+                        toast.success('Account deletion requested (demo)');
+                        setShowDeleteConfirm(false);
+                      }}
                       className="px-6 py-2.5 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors"
                     >
                       Yes, Delete Forever

@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { API_BASE } from '../config';
+import { toast } from 'sonner';
 
 interface User {
   name: string;
@@ -50,13 +51,22 @@ export default function ManageUsers({ onLogout }: ManageUsersProps) {
     const newStatus = prompt("Enter status (active, suspended, pending):");
     if (!newStatus) return;
 
-    await fetch(`${API_BASE}/admin/users/${email}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, status: newStatus })
-    });
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/${email}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName, status: newStatus })
+      });
 
-    loadUsers();
+      if (res.ok) {
+        toast.success("User updated successfully!");
+      } else {
+        toast.error("Failed to update user");
+      }
+      loadUsers();
+    } catch (err) {
+      toast.error("Error updating user");
+    }
   };
 
   // -------------------------------
@@ -66,13 +76,22 @@ export default function ManageUsers({ onLogout }: ManageUsersProps) {
   // Toggle: if suspended → active. If active → suspended
   const newStatus = currentStatus === "suspended" ? "active" : "suspended";
 
-  await fetch(`${API_BASE}/admin/users/${email}/status`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: newStatus })
-  });
+  try {
+    const res = await fetch(`${API_BASE}/admin/users/${email}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus })
+    });
 
-  loadUsers();
+    if (res.ok) {
+      toast.success(newStatus === "suspended" ? "User suspended" : "User activated");
+    } else {
+      toast.error("Failed to update user status");
+    }
+    loadUsers();
+  } catch (err) {
+    toast.error("Error updating user status");
+  }
 };
 
 
@@ -80,6 +99,8 @@ export default function ManageUsers({ onLogout }: ManageUsersProps) {
   // DELETE USER
   // -------------------------------
   const handleDelete = async (email: string) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+
     try {
       const encodedEmail = encodeURIComponent(email);
 
@@ -91,9 +112,11 @@ export default function ManageUsers({ onLogout }: ManageUsersProps) {
         throw new Error(`Failed: ${res.status}`);
       }
 
+      toast.success("User deleted successfully!");
       loadUsers(); // reload after delete
     } catch (err) {
       console.error("Delete error:", err);
+      toast.error("Error deleting user");
     }
   };
 

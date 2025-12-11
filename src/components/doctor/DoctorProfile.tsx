@@ -13,6 +13,7 @@ import {
 import { useState, useEffect } from "react";
 import { API_BASE } from "../config";
 import { editDoctorSchema, validateField, validateForm, hasErrors } from '../utils/validation';
+import { toast } from 'sonner';
 
 interface DoctorProfileProps {
   onLogout?: () => void;
@@ -154,15 +155,16 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
       });
 
       if (!res.ok) {
-        alert("Update failed");
+        toast.error("Update failed");
         return;
       }
 
+      toast.success("Profile updated successfully!");
       setProfileData({ ...editData });
       setIsEditing(false);
     } catch (err) {
       console.error("Update error:", err);
-      alert("Server error");
+      toast.error("Server error");
     } finally {
       setSaving(false);
     }
