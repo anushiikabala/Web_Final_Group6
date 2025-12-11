@@ -76,42 +76,6 @@ export default function SignIn({ onSignIn, onAdminSignIn, onDoctorSignIn }: Sign
 
     setIsLoading(true);
 
-    // ADMIN LOGIN (hardcoded check)
-    if (email === "admin1@gmail.com" && password === "abc") {
-      localStorage.setItem("adminEmail", email);
-      onAdminSignIn();
-      navigate("/admin/dashboard");
-      setIsLoading(false);
-      return;
-    }
-
-    // DOCTOR LOGIN - Try doctor login first
-    try {
-      const doctorResponse = await fetch(`${API_BASE}/auth/doctor-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (doctorResponse.ok) {
-        const doctorData = await doctorResponse.json();
-        localStorage.setItem("doctorEmail", email);
-        if (doctorData.token) {
-          localStorage.setItem("doctorToken", doctorData.token);
-        }
-        if (onDoctorSignIn) {
-          onDoctorSignIn();
-        }
-        navigate("/doctor/dashboard");
-        setIsLoading(false);
-        return;
-      }
-    } catch (error) {
-      // Doctor login failed, continue to user login
-      console.log("Not a doctor account, trying user login...");
-    }
-
-    // USER LOGIN (CHECK DB)
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
@@ -127,9 +91,31 @@ export default function SignIn({ onSignIn, onAdminSignIn, onDoctorSignIn }: Sign
         return;
       }
 
-      onSignIn();
-      localStorage.setItem("userEmail", email);
-      navigate("/view-reports");
+      // Store token
+      if (data.token) {
+        localStorage.setItem("authToken", data.token);
+      }
+
+      // Role-based routing
+      const role = data.role || 'user';
+
+      if (role === 'admin') {
+        localStorage.setItem("adminEmail", email);
+        onAdminSignIn();
+        navigate("/admin/dashboard");
+      } else if (role === 'doctor') {
+        localStorage.setItem("doctorEmail", email);
+        localStorage.setItem("doctorToken", data.token);
+        if (onDoctorSignIn) {
+          onDoctorSignIn();
+        }
+        navigate("/doctor/dashboard");
+      } else {
+        // Default: regular user
+        localStorage.setItem("userEmail", email);
+        onSignIn();
+        navigate("/view-reports");
+      }
 
     } catch (error) {
       console.error("Login error", error);

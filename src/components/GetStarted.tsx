@@ -5,6 +5,7 @@ import { FaGithub } from 'react-icons/fa';
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import { signupSchema, validateField, validateForm, hasErrors } from './utils/validation';
+import { API_BASE } from './config';
 
 interface GetStartedProps {
   onSignUp: () => void;
@@ -84,7 +85,7 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
 
     // Call backend signup API
     try {
-      const response = await fetch("http://127.0.0.1:5000/auth/signup", {
+      const response = await fetch(`${API_BASE}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,6 +102,9 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
         return;
       }
 
+      // Store the new user's email in localStorage
+      localStorage.setItem("userEmail", formData.email);
+      
       alert("Account created successfully");
       onSignUp();
       navigate("/profile");
@@ -115,7 +119,7 @@ export default function GetStarted({ onSignUp }: GetStartedProps) {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      await fetch("http://127.0.0.1:5000/auth/signup", {
+      await fetch(`${API_BASE}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

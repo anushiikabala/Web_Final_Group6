@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { API_BASE } from "../config";
+import { editDoctorSchema, validateField, validateForm, hasErrors } from '../utils/validation';
 
 interface DoctorProfileProps {
   onLogout?: () => void;
@@ -38,6 +39,59 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [editData, setEditData] = useState<ProfileData | null>(null);
+
+  // Validation state
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Handle field change with validation
+  const handleFieldChange = (field: string, value: string) => {
+    if (!editData) return;
+    const newEditData = { ...editData, [field]: value };
+    setEditData(newEditData as ProfileData);
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: null });
+    }
+  };
+
+  // Handle field blur for validation
+  const handleBlur = (field: string) => {
+    if (!editData) return;
+    setTouched({ ...touched, [field]: true });
+    
+    const schema = editDoctorSchema[field as keyof typeof editDoctorSchema];
+    if (schema) {
+      const error = validateField(String(editData[field as keyof ProfileData] || ''), schema);
+      setErrors({ ...errors, [field]: error });
+    }
+  };
+
+  // Validate all fields before save
+  const validateAllFields = (): boolean => {
+    if (!editData) return false;
+    
+    const formValues: Record<string, string> = {
+      name: editData.name || '',
+      specialization: editData.specialization || '',
+      phone: editData.phone || '',
+      licenseNumber: editData.licenseNumber || '',
+      experience: editData.experience || '',
+    };
+    
+    const validationErrors = validateForm(formValues, editDoctorSchema);
+    setErrors(validationErrors);
+    setTouched({
+      name: true,
+      specialization: true,
+      phone: true,
+      licenseNumber: true,
+      experience: true,
+    });
+    
+    return !hasErrors(validationErrors);
+  };
 
   // Load doctor profile from backend
   useEffect(() => {
@@ -77,12 +131,19 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
     if (profileData) {
       setEditData({ ...profileData });
       setIsEditing(true);
+      setErrors({});
+      setTouched({});
     }
   };
 
   // Save changes to backend
   const handleSave = async () => {
     if (!email || !editData) return;
+
+    // Validate before saving
+    if (!validateAllFields()) {
+      return;
+    }
 
     try {
       setSaving(true);
@@ -112,6 +173,8 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
       setEditData({ ...profileData });
     }
     setIsEditing(false);
+    setErrors({});
+    setTouched({});
   };
 
   const handleAddCertification = () => {
@@ -228,11 +291,15 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
                       </label>
                       <input
                         value={editData.name}
-                        onChange={(e) =>
-                          setEditData({ ...editData, name: e.target.value })
-                        }
-                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                        onChange={(e) => handleFieldChange('name', e.target.value)}
+                        onBlur={() => handleBlur('name')}
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                          touched.name && errors.name ? 'border-red-500' : 'border-gray-300'
+                        }`}
                       />
+                      {touched.name && errors.name && (
+                        <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                      )}
                     </div>
 
                     {/* SPECIALIZATION */}
@@ -242,14 +309,15 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
                       </label>
                       <input
                         value={editData.specialization}
-                        onChange={(e) =>
-                          setEditData({
-                            ...editData,
-                            specialization: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                        onChange={(e) => handleFieldChange('specialization', e.target.value)}
+                        onBlur={() => handleBlur('specialization')}
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                          touched.specialization && errors.specialization ? 'border-red-500' : 'border-gray-300'
+                        }`}
                       />
+                      {touched.specialization && errors.specialization && (
+                        <p className="mt-1 text-sm text-red-600">{errors.specialization}</p>
+                      )}
                     </div>
 
                     {/* DEGREE */}
@@ -262,7 +330,7 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
                         onChange={(e) =>
                           setEditData({ ...editData, degree: e.target.value })
                         }
-                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       />
                     </div>
                   </div>
@@ -322,14 +390,20 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">Phone</p>
                   {isEditing && editData ? (
-                    <input
-                      value={editData.phone}
-                      onChange={(e) =>
-                        setEditData({ ...editData, phone: e.target.value })
-                      }
-                      className="px-4 py-2 border rounded-xl w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      placeholder="Enter phone number"
-                    />
+                    <>
+                      <input
+                        value={editData.phone}
+                        onChange={(e) => handleFieldChange('phone', e.target.value)}
+                        onBlur={() => handleBlur('phone')}
+                        className={`px-4 py-2 border rounded-xl w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                          touched.phone && errors.phone ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Enter phone number"
+                      />
+                      {touched.phone && errors.phone && (
+                        <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                      )}
+                    </>
                   ) : (
                     <p className="font-medium text-gray-900">
                       {profileData.phone || "N/A"}
@@ -341,21 +415,24 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
               {/* Experience */}
               <div className="flex items-start gap-3">
                 <Calendar className="w-6 h-6 text-purple-600 flex-shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">Experience</p>
                   {isEditing && editData ? (
-                    <input
-                      type="number"
-                      value={editData.experience}
-                      onChange={(e) =>
-                        setEditData({
-                          ...editData,
-                          experience: e.target.value,
-                        })
-                      }
-                      className="px-4 py-2 border rounded-xl w-24 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      placeholder="Years"
-                    />
+                    <>
+                      <input
+                        type="number"
+                        value={editData.experience}
+                        onChange={(e) => handleFieldChange('experience', e.target.value)}
+                        onBlur={() => handleBlur('experience')}
+                        className={`px-4 py-2 border rounded-xl w-24 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                          touched.experience && errors.experience ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Years"
+                      />
+                      {touched.experience && errors.experience && (
+                        <p className="mt-1 text-sm text-red-600">{errors.experience}</p>
+                      )}
+                    </>
                   ) : (
                     <p className="font-medium text-gray-900">
                       {profileData.experience ? `${profileData.experience} years` : "N/A"}
@@ -370,17 +447,20 @@ export default function DoctorProfile({ onLogout }: DoctorProfileProps) {
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 mb-1">License Number</p>
                   {isEditing && editData ? (
-                    <input
-                      value={editData.licenseNumber}
-                      onChange={(e) =>
-                        setEditData({
-                          ...editData,
-                          licenseNumber: e.target.value,
-                        })
-                      }
-                      className="px-4 py-2 border rounded-xl w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      placeholder="Enter license number"
-                    />
+                    <>
+                      <input
+                        value={editData.licenseNumber}
+                        onChange={(e) => handleFieldChange('licenseNumber', e.target.value)}
+                        onBlur={() => handleBlur('licenseNumber')}
+                        className={`px-4 py-2 border rounded-xl w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                          touched.licenseNumber && errors.licenseNumber ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Enter license number"
+                      />
+                      {touched.licenseNumber && errors.licenseNumber && (
+                        <p className="mt-1 text-sm text-red-600">{errors.licenseNumber}</p>
+                      )}
+                    </>
                   ) : (
                     <p className="font-medium text-gray-900">
                       {profileData.licenseNumber || "N/A"}

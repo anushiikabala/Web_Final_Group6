@@ -107,3 +107,23 @@ export const profileSchema = {
   height: [rules.positiveNumber('Height')],
   weight: [rules.positiveNumber('Weight')],
 };
+
+// Doctor form validation schema (for Add Doctor in Admin)
+export const addDoctorSchema = {
+  name: [rules.required('Full name'), rules.name(), rules.minLength(2, 'Name')],
+  email: [rules.required('Email'), rules.email()],
+  specialization: [rules.required('Specialization')],
+  phone: [rules.required('Phone number'), rules.phone()],
+  licenseNumber: [rules.required('License number'), rules.minLength(3, 'License number')],
+  password: [rules.required('Password'), rules.password()],
+  confirmPassword: [rules.required('Confirm password'), rules.matchesField('password', 'Password')],
+};
+
+// Doctor profile edit validation schema
+export const editDoctorSchema = {
+  name: [rules.required('Full name'), rules.name(), rules.minLength(2, 'Name')],
+  specialization: [rules.required('Specialization')],
+  phone: [rules.phone()],
+  licenseNumber: [rules.minLength(3, 'License number')],
+  experience: [rules.positiveNumber('Experience')],
+};

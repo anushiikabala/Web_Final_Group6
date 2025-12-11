@@ -1,4 +1,5 @@
 import Navbar from "./Navbar";
+import { API_BASE } from './config';
 
 import {
   LineChart,
@@ -88,7 +89,7 @@ export default function Trends() {
       return;
     }
 
-    fetch(`http://127.0.0.1:5000/all-reports?email=${encodeURIComponent(email)}`)
+    fetch(`${API_BASE}/all-reports?email=${encodeURIComponent(email)}`)
       .then((res) => res.json())
       .then((data) => {
         const reports: BackendReport[] = data.reports || [];

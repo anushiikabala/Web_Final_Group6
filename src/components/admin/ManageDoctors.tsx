@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { API_BASE } from "../config";
+import { addDoctorSchema, validateField, validateForm, hasErrors } from '../utils/validation';
 
 interface ManageDoctorsProps {
   onLogout?: () => void;
@@ -40,6 +41,7 @@ interface FormData {
   licenseNumber: string;
   password: string;
   confirmPassword: string;
+  [key: string]: string; // Index signature for validation
 }
 
 interface NewDoctorCredentials {
@@ -70,6 +72,52 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
     confirmPassword: "",
   });
 
+  // Validation state
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Handle field change
+  const handleFieldChange = (field: string, value: string) => {
+    const newFormData = { ...formData, [field]: value };
+    setFormData(newFormData as FormData);
+    
+    // Real-time validation for password fields
+    if (touched[field]) {
+      const error = validateField(
+        value,
+        addDoctorSchema[field as keyof typeof addDoctorSchema] || [],
+        newFormData
+      );
+      setErrors({ ...errors, [field]: error });
+    }
+  };
+
+  // Handle field blur
+  const handleBlur = (field: string) => {
+    setTouched({ ...touched, [field]: true });
+    const error = validateField(
+      formData[field] || '',
+      addDoctorSchema[field as keyof typeof addDoctorSchema] || [],
+      formData
+    );
+    setErrors({ ...errors, [field]: error });
+  };
+
+  // Reset form and validation state
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      email: "",
+      specialization: "",
+      phone: "",
+      licenseNumber: "",
+      password: "",
+      confirmPassword: "",
+    });
+    setErrors({});
+    setTouched({});
+  };
+
   const [doctors, setDoctors] = useState<Doctor[]>([]);
 
   // Fetch doctors from backend
@@ -93,8 +141,20 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
 
   // Add doctor
   const handleAddDoctor = async (): Promise<void> => {
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match");
+    // Validate all fields
+    const validationErrors = validateForm(formData, addDoctorSchema);
+    setErrors(validationErrors);
+    setTouched({
+      name: true,
+      email: true,
+      specialization: true,
+      phone: true,
+      licenseNumber: true,
+      password: true,
+      confirmPassword: true,
+    });
+
+    if (hasErrors(validationErrors)) {
       return;
     }
 
@@ -128,15 +188,8 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
       setShowSuccessModal(true);
       setShowAddModal(false);
 
-      setFormData({
-        name: "",
-        email: "",
-        specialization: "",
-        phone: "",
-        licenseNumber: "",
-        password: "",
-        confirmPassword: "",
-      });
+      // Reset form and validation state
+      resetForm();
 
       await fetchDoctors();
     } catch (error) {
@@ -417,34 +470,52 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
             <h2 className="text-2xl font-semibold mb-6">Add New Doctor</h2>
 
             <div className="space-y-4 mb-6">
+              {/* Full Name */}
               <div>
                 <label className="block text-sm font-medium mb-2">Full Name</label>
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => handleFieldChange('name', e.target.value)}
+                  onBlur={() => handleBlur('name')}
                   placeholder="Dr. John Doe"
-                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                    touched.name && errors.name ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {touched.name && errors.name && (
+                  <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                )}
               </div>
 
+              {/* Email Address */}
               <div>
                 <label className="block text-sm font-medium mb-2">Email Address</label>
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => handleFieldChange('email', e.target.value)}
+                  onBlur={() => handleBlur('email')}
                   placeholder="doctor@example.com"
-                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                    touched.email && errors.email ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {touched.email && errors.email && (
+                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                )}
               </div>
 
+              {/* Specialization */}
               <div>
                 <label className="block text-sm font-medium mb-2">Specialization</label>
                 <select
                   value={formData.specialization}
-                  onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
-                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  onChange={(e) => handleFieldChange('specialization', e.target.value)}
+                  onBlur={() => handleBlur('specialization')}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                    touched.specialization && errors.specialization ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 >
                   <option value="">Select specialization</option>
                   <option value="General Medicine">General Medicine</option>
@@ -455,39 +526,60 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
                   <option value="Hematology">Hematology</option>
                   <option value="Internal Medicine">Internal Medicine</option>
                 </select>
+                {touched.specialization && errors.specialization && (
+                  <p className="mt-1 text-sm text-red-600">{errors.specialization}</p>
+                )}
               </div>
 
+              {/* Phone Number */}
               <div>
                 <label className="block text-sm font-medium mb-2">Phone Number</label>
                 <input
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => handleFieldChange('phone', e.target.value)}
+                  onBlur={() => handleBlur('phone')}
                   placeholder="(555) 123-4567"
-                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                    touched.phone && errors.phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {touched.phone && errors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                )}
               </div>
 
+              {/* License Number */}
               <div>
                 <label className="block text-sm font-medium mb-2">Medical License Number</label>
                 <input
                   type="text"
                   value={formData.licenseNumber}
-                  onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
+                  onChange={(e) => handleFieldChange('licenseNumber', e.target.value)}
+                  onBlur={() => handleBlur('licenseNumber')}
                   placeholder="MD-12345"
-                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                    touched.licenseNumber && errors.licenseNumber ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {touched.licenseNumber && errors.licenseNumber && (
+                  <p className="mt-1 text-sm text-red-600">{errors.licenseNumber}</p>
+                )}
               </div>
 
+              {/* Password */}
               <div>
                 <label className="block text-sm font-medium mb-2">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    onChange={(e) => handleFieldChange('password', e.target.value)}
+                    onBlur={() => handleBlur('password')}
                     placeholder="Enter password"
-                    className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                      touched.password && errors.password ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
                   <button
                     type="button"
@@ -497,17 +589,35 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
                     {showPassword ? <EyeOff className="w-5 h-5 text-gray-500" /> : <Eye className="w-5 h-5 text-gray-500" />}
                   </button>
                 </div>
+                {touched.password && errors.password && (
+                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                )}
+                {!touched.password && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Must be 8+ characters with uppercase, lowercase, and number
+                  </p>
+                )}
+                {touched.password && !errors.password && formData.password.length >= 8 && (
+                  <p className="mt-1 text-sm text-green-600">✓ Password meets requirements</p>
+                )}
               </div>
 
+              {/* Confirm Password */}
               <div>
                 <label className="block text-sm font-medium mb-2">Confirm Password</label>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
+                  onBlur={() => handleBlur('confirmPassword')}
                   placeholder="Confirm password"
-                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                    touched.confirmPassword && errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {touched.confirmPassword && errors.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+                )}
               </div>
             </div>
 
@@ -520,7 +630,10 @@ export default function ManageDoctors({ onLogout }: ManageDoctorsProps) {
                 {saving ? "Adding..." : "Add Doctor"}
               </button>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  resetForm();
+                }}
                 className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors"
               >
                 Cancel

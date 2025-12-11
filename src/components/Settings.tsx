@@ -1,5 +1,6 @@
 import Navbar from './Navbar';
 import { Bell, Trash2, Globe, Shield } from 'lucide-react';
+import { API_BASE } from './config';
 import { useState } from 'react';
 
 interface SettingsProps {
@@ -47,7 +48,7 @@ export default function Settings({ onSignOut }: SettingsProps) {
   }
 
   try {
-    const response = await fetch("http://127.0.0.1:5000/auth/change-password", {
+    const response = await fetch(`${API_BASE}/auth/change-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
