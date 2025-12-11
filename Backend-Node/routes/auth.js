@@ -196,6 +196,62 @@ router.post('/login', async (req, res) => {
  *       404:
  *         description: User not found
  */
+/**
+ * @swagger
+ * /auth/doctor-login:
+ *   post:
+ *     summary: Login as doctor
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Doctor login successful
+ *       401:
+ *         description: Invalid credentials or not a doctor account
+ */
+router.post('/doctor-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user with doctor role
+    const user = await User.findOne({ email, role: 'doctor' });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials or not a doctor account' });
+    }
+
+    // Check password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+
+    // Generate token
+    const token = generateToken(user._id, user.email);
+
+    res.status(200).json({
+      message: 'Doctor login successful',
+      email: user.email,
+      token
+    });
+  } catch (error) {
+    console.error('Doctor login error:', error);
+    res.status(500).json({ error: 'Server error during doctor login' });
+  }
+});
+
 router.post('/change-password', async (req, res) => {
   try {
     const { email, currentPassword, newPassword } = req.body;

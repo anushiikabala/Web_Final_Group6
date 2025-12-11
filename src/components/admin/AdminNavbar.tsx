@@ -1,26 +1,34 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, LayoutDashboard, Users, FileText,  LogOut } from 'lucide-react';
+import { Activity, LayoutDashboard, Users, FileText, UserCog, LogOut } from 'lucide-react';
 
-export default function AdminNavbar() {
+interface AdminNavbarProps {
+  onLogout?: () => void;
+}
+
+export default function AdminNavbar({ onLogout }: AdminNavbarProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
   const navItems = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/users', label: 'Users', icon: Users },
+    { path: '/admin/doctors', label: 'Doctors', icon: UserCog },
     { path: '/admin/reports', label: 'Reports', icon: FileText },
-    // { path: '/admin/reference-ranges', label: 'Reference Ranges', icon: Settings },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   const handleLogout = () => {
+    localStorage.removeItem("adminEmail");
+    if (onLogout) {
+      onLogout();
+    }
     navigate('/signin');
   };
 
   return (
     <nav className="bg-gray-900 shadow-lg border-b border-gray-800 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-5">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-4">
         <div className="flex items-center justify-between">
           <Link to="/admin/dashboard" className="flex items-center gap-3">
             <Activity className="w-8 h-8 text-blue-500" />
@@ -37,31 +45,32 @@ export default function AdminNavbar() {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-colors ${
                     isActive(item.path)
                       ? 'bg-blue-600 text-white'
                       : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                   }`}
                 >
                   <Icon className="w-5 h-5" />
-                  {item.label}
+                  <span className="hidden lg:inline">{item.label}</span>
                 </Link>
               );
-            })}</div>
+            })}
+          </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
               to="/"
-              className="px-5 py-2.5 text-gray-300 hover:bg-gray-800 hover:text-white rounded-xl font-medium transition-colors"
+              className="px-4 py-2.5 text-gray-300 hover:bg-gray-800 hover:text-white rounded-xl font-medium transition-colors hidden sm:block"
             >
               Main Site
             </Link>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-5 py-2.5 text-red-400 hover:bg-red-900/20 rounded-xl font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-red-400 hover:bg-red-900/20 rounded-xl font-medium transition-colors"
             >
               <LogOut className="w-5 h-5" />
-              Logout
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>

@@ -5,17 +5,20 @@ import { useState } from 'react';
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import { loginSchema, validateField, validateForm, hasErrors } from './utils/validation';
+import { API_BASE } from './config';
 
 interface SignInProps {
   onSignIn: () => void;
   onAdminSignIn: () => void;
+  onDoctorSignIn?: () => void;
 }
 
-export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
+export default function SignIn({ onSignIn, onAdminSignIn, onDoctorSignIn }: SignInProps) {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Validation state
   const [errors, setErrors] = useState<Record<string, string | null>>({});
@@ -30,10 +33,11 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
 
   const handleGoogleLogin = async () => {
     try {
+      setIsLoading(true);
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      await fetch("http://127.0.0.1:5000/auth/signup", {
+      await fetch(`${API_BASE}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -51,6 +55,8 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
     } catch (err) {
       console.error(err);
       alert("Google sign-in failed");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -68,16 +74,46 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
       return;
     }
 
-    // ADMIN LOGIN (NO DB CHECK)
+    setIsLoading(true);
+
+    // ADMIN LOGIN (hardcoded check)
     if (email === "admin1@gmail.com" && password === "abc") {
+      localStorage.setItem("adminEmail", email);
       onAdminSignIn();
       navigate("/admin/dashboard");
+      setIsLoading(false);
       return;
+    }
+
+    // DOCTOR LOGIN - Try doctor login first
+    try {
+      const doctorResponse = await fetch(`${API_BASE}/auth/doctor-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (doctorResponse.ok) {
+        const doctorData = await doctorResponse.json();
+        localStorage.setItem("doctorEmail", email);
+        if (doctorData.token) {
+          localStorage.setItem("doctorToken", doctorData.token);
+        }
+        if (onDoctorSignIn) {
+          onDoctorSignIn();
+        }
+        navigate("/doctor/dashboard");
+        setIsLoading(false);
+        return;
+      }
+    } catch (error) {
+      // Doctor login failed, continue to user login
+      console.log("Not a doctor account, trying user login...");
     }
 
     // USER LOGIN (CHECK DB)
     try {
-      const response = await fetch("http://127.0.0.1:5000/auth/login", {
+      const response = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -86,7 +122,8 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error);
+        alert(data.error || "Invalid credentials");
+        setIsLoading(false);
         return;
       }
 
@@ -97,6 +134,8 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
     } catch (error) {
       console.error("Login error", error);
       alert("Server error — backend not reachable");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -148,6 +187,7 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
                       touched.email && errors.email ? 'border-red-500' : 'border-gray-300'
                     }`}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 {touched.email && errors.email && (
@@ -170,6 +210,7 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
                       touched.password && errors.password ? 'border-red-500' : 'border-gray-300'
                     }`}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 {touched.password && errors.password && (
@@ -196,9 +237,10 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
               {/* SIGN IN BUTTON */}
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3.5 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3.5 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Sign In
+                {isLoading ? "Signing in..." : "Sign In"}
               </button>
             </form>
 
@@ -216,13 +258,17 @@ export default function SignIn({ onSignIn, onAdminSignIn }: SignInProps) {
               <div className="mt-6 grid grid-cols-2 gap-4">
                 <button
                   onClick={handleGoogleLogin}
-                  className="flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                  disabled={isLoading}
+                  className="flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
                   <FcGoogle className="w-5 h-5" />
                   <span className="font-medium text-gray-700">Google</span>
                 </button>
 
-                <button className="flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
+                <button 
+                  disabled={isLoading}
+                  className="flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
                   <Github className="w-5 h-5" />
                   <span className="font-medium text-gray-700">GitHub</span>
                 </button>
